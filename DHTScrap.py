@@ -36,6 +36,7 @@ class DHTSpider(Process):
                 self.get_init_nodes()
             for node in nodes:
                 self.socket.sendto(flatbencode.encode(msg), node.address)
+                time.sleep(0.1)
             for infohash in self.announced:
                 for node in self.announced[infohash]:
                     if node.bad:
@@ -68,7 +69,7 @@ class DHTSpider(Process):
                             self.routetable.append(Node(resp[b'a'][b'id'], addr))
                         elif b'get_peers' in resp[b'q']:
                             info_hash = resp[b'a'][b'info_hash']
-                            logging.debug('{} {} {}'.format(addr, 'asked : ', info_hash))
+                            logging.info('{} {} {}'.format(addr, 'asked : ', BitArray(info_hash).hex.upper()))
                             if info_hash not in self.announced:
                                 neighbors = self.routetable.get_neighbors(info_hash)
                                 neighbors = self.pack_neighbors(neighbors)
@@ -80,7 +81,7 @@ class DHTSpider(Process):
                             self.routetable.append(Node(resp[b'a'][b'id'], addr))
                         elif b'announce_peer' in resp[b'q']:
                             info_hash = resp[b'a'][b'info_hash']
-                            logging.info('{} {} {}'.format(addr, 'announced : ', info_hash))
+                            logging.info('{} {} {}'.format(addr, 'announced : ', BitArray(info_hash).hex.upper()))
                             msg = {b't': resp[b't'], b'y': b'r', b'r': {b'id': self.myid}}
                             if resp[b'a'][b'implied_port']:
                                 node = Node(resp[b'a'][b'id'], addr, resp[b'a'][b'port'])
@@ -126,13 +127,13 @@ class DHTSpider(Process):
             return False
         if not re.match(r'(\d+.){4}', node.address[0]):
             return False
-        if node.address[1] < 0 or node.address[1] > 2**16:
+        if node.address[1] <= 0 or node.address[1] > 2**16:
             return False
         return True
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='[%(asctime)s](%(levelname): %(message)s)', datefmt=('%H:%M:%S'), level=logging.DEBUG)
+    logging.basicConfig(format='[%(asctime)s](%(levelname)s): %(message)s', datefmt=('%H:%M:%S'), level=logging.INFO)
     pool = []
     for each in range(8):
         dht = DHTSpider()

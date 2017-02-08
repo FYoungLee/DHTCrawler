@@ -1,5 +1,6 @@
 import flatbencode
 import re
+import logging
 from struct import unpack
 from threading import Thread
 from multiprocessing import Process, Queue
@@ -35,12 +36,11 @@ class DHTSpider(Process):
                 self.get_init_nodes()
             for node in nodes:
                 self.socket.sendto(flatbencode.encode(msg), node.address)
-                time.sleep(0.1)
             for infohash in self.announced:
                 for node in self.announced[infohash]:
                     if node.bad:
                         self.announced[infohash].remove(node)
-            time.sleep(randint(1,5))
+            time.sleep(randint(4, 8))
 
     def run(self):
         Thread(target=self.nodes_traverse).start()
@@ -57,18 +57,18 @@ class DHTSpider(Process):
                     msg = None
                     try:
                         if b'ping' in resp[b'q']:
-                            # self.log('{} {}'.format(addr, 'pinged me'))
+                            logging.debug('{} {}'.format(addr, 'pinged me'))
                             msg = {b't': resp[b't'], b'y': b'r', b'r': {b'id': self.myid}}
                             self.routetable.append(Node(resp[b'a'][b'id'], addr))
                         elif b'find_node' in resp[b'q']:
-                            # self.log('{} {}'.format(addr, 'asked nodes'))
+                            logging.debug('{} {}'.format(addr, 'asked nodes'))
                             neighbors = self.routetable.get_neighbors(resp[b'a'][b'target'])
                             neighbors = self.pack_neighbors(neighbors)
                             msg = {b't': resp[b't'], b'y': b'r', b'r': {b'id': self.myid, b'nodes': neighbors}}
                             self.routetable.append(Node(resp[b'a'][b'id'], addr))
                         elif b'get_peers' in resp[b'q']:
                             info_hash = resp[b'a'][b'info_hash']
-                            self.log('{} {} {}'.format(addr, 'asked info hash: ', info_hash))
+                            logging.debug('{} {} {}'.format(addr, 'asked : ', info_hash))
                             if info_hash not in self.announced:
                                 neighbors = self.routetable.get_neighbors(info_hash)
                                 neighbors = self.pack_neighbors(neighbors)
@@ -80,7 +80,7 @@ class DHTSpider(Process):
                             self.routetable.append(Node(resp[b'a'][b'id'], addr))
                         elif b'announce_peer' in resp[b'q']:
                             info_hash = resp[b'a'][b'info_hash']
-                            self.log('{} {} {}'.format(addr, 'announced info hash: ', info_hash))
+                            logging.info('{} {} {}'.format(addr, 'announced : ', info_hash))
                             msg = {b't': resp[b't'], b'y': b'r', b'r': {b'id': self.myid}}
                             if resp[b'a'][b'implied_port']:
                                 node = Node(resp[b'a'][b'id'], addr, resp[b'a'][b'port'])
@@ -131,11 +131,8 @@ class DHTSpider(Process):
         return True
 
 
-    def log(self, msg):
-        print('[{}] ({}) {}'.format(time.ctime(), self.name, msg))
-
-
 if __name__ == '__main__':
+    logging.basicConfig(format='[%(asctime)s](%(levelname): %(message)s)', datefmt=('%H:%M:%S'), level=logging.DEBUG)
     pool = []
     for each in range(8):
         dht = DHTSpider()

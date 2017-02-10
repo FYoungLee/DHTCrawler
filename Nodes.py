@@ -1,8 +1,5 @@
 import time
 from bitstring import BitArray
-from struct import pack
-import socket
-from tools import *
 
 K = 8
 
@@ -16,9 +13,15 @@ class Leaf(list):
         self.leaf = True
 
     def append(self, p_object):
+        if not self.in_range(p_object):
+            return 'Out of Range'
         if p_object in self:
-            self[self.index(p_object)].refresh()
-            return
+            node = self[self.index(p_object)]
+            if p_object.implied_port:
+                node.refresh()
+            else:
+                node.refresh(p_object.p_port)
+            return 'updated'
         if self.leaf:
             if K <= len(self):
                 self._split(p_object)
@@ -29,6 +32,7 @@ class Leaf(list):
             self.L.append(p_object)
         elif self.R.in_range(p_object):
             self.R.append(p_object)
+        return 'appended'
 
     def _split(self, p_object):
         mid = (self.Min + self.Max) // 2
@@ -107,11 +111,16 @@ class Leaf(list):
         self.leaf = True
 
 class Node:
-    def __init__(self, nid, address, ann_port=None):
+    def __init__(self, nid, ip, n_port, p_port=None):
         self.nid = nid
-        self.address = address
-        self.ann_port = ann_port if ann_port else address[1]
+        self.ip = ip
+        self.n_port = n_port
+        self.p_port = p_port if p_port else self.n_port
         self.last = time.time()
+
+    @property
+    def address(self):
+        return (self.ip, self.n_port)
 
     @property
     def uint(self):
@@ -123,6 +132,10 @@ class Node:
             return False
         return True
 
+    @property
+    def implied_port(self):
+        return self.p_port == self.n_port
+
     def __eq__(self, other):
         return self.nid == other.nid
 
@@ -133,20 +146,10 @@ class Node:
         return self.uint < other.uint
 
     def __repr__(self):
-        return 'NodeID : {} ; Address : {}'.format(self.nid, self.address)
+        return 'NodeID : {} ; Address : {}'.format(self.nid, (self.ip, self.n_port))
 
-    def refresh(self):
+    def refresh(self, p_port=None):
         self.last = time.time()
-
-    def nid_pack(self):
-        return self.nid + socket.inet_aton(self.address[0]) + pack('>H', self.address[1])
-
-    def addr_pack(self):
-        return socket.inet_aton(self.address[0]) + pack('>H', self.address[1])
-
-if __name__ == '__main__':
-    node = Node(hashnid(), ('1.1.1.1', 1))
-    print(node)
-    print(node.nid_pack())
-    print(node.addr_pack())
+        if p_port:
+            self.p_port = p_port
 

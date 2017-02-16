@@ -1,16 +1,18 @@
 import time
-from bitstring import BitArray
+from tools import *
 
 K = 8
+MAX_Depth = 20
 
 class Leaf(list):
-    def __init__(self, _min=0, _max=2**160):
+    def __init__(self, _min=0, _max=2**160, depth=0):
         super().__init__()
         self.Min = _min
         self.Max = _max
         self.L = None
         self.R = None
         self.leaf = True
+        self.depth = depth
 
     def append(self, p_object):
         if not self.in_range(p_object):
@@ -22,22 +24,25 @@ class Leaf(list):
             else:
                 node.refresh(p_object.p_port)
             return 'updated'
-        if self.leaf:
-            if K <= len(self):
-                self._split(p_object)
-            else:
-                super().append(p_object)
-                self.sort()
-        elif self.L.in_range(p_object):
-            self.L.append(p_object)
-        elif self.R.in_range(p_object):
-            self.R.append(p_object)
-        return 'appended'
+        if self.depth <= MAX_Depth:
+            if self.leaf:
+                if len(self) >= K:
+                    self._split(p_object)
+                else:
+                    super().append(p_object)
+                    self.sort()
+            elif self.L.in_range(p_object):
+                self.L.append(p_object)
+            elif self.R.in_range(p_object):
+                self.R.append(p_object)
+            return 'appended'
+        else:
+            return 'Tree too large.'
 
     def _split(self, p_object):
         mid = (self.Min + self.Max) // 2
-        self.L = Leaf(self.Min, mid)
-        self.R = Leaf(mid, self.Max)
+        self.L = Leaf(self.Min, mid, self.depth+1)
+        self.R = Leaf(mid, self.Max, self.depth+1)
         for each in self:
             if self.L.in_range(each):
                 self.L.append(each)
@@ -153,3 +158,18 @@ class Node:
         if p_port:
             self.p_port = p_port
 
+
+class Peer:
+    def __init__(self, infohash, con_id, ts_differ=None, seq=None, ack=None):
+        self.infohash = infohash
+        self.pid = randomnid()
+        self.con_id = con_id
+        self.ts_differ = ts_differ if ts_differ else 0
+        self.seq = seq + 1 if seq else randint(1, 65535)
+        self.ack = ack if ack else 0
+        self.alive = False
+
+    def seq_update(self, ack):
+        self.alive = True
+        self.ack = ack
+        self.seq += 1
